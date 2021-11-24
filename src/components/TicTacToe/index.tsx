@@ -93,6 +93,7 @@ let ENDPOINT = process.env.REACt_APP_ENDPOINT;
 const TicTacToeComponent = () => {
   const elementRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const backupActiveBlock = useRef<BlockIndex[]>([]);
 
   const [activeBlock, setActiveBlock] = useState<BlockIndex[]>([]);
   const [victoryMsg, setVictoryMsg] = useState("");
@@ -136,15 +137,14 @@ const TicTacToeComponent = () => {
     });
 
     socket.on("mark-down", (step: BlockIndex) => {
-      const stepExisted = activeBlock.every(
-        (block) => JSON.stringify(block.step) === JSON.stringify(step.step)
-      );
-      if (!activeBlock.length || !stepExisted) {
-        setActiveBlock([...activeBlock, step]);
-      }
+      setActiveBlock([...backupActiveBlock.current, step]);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, activeBlock]);
+  }, [socket]);
+
+  useEffect(() => {
+    backupActiveBlock.current = [...activeBlock];
+  }, [activeBlock]);
 
   const currentPlayer = useMemo(() => {
     return roomInfo?.personJoined.findIndex(
@@ -159,6 +159,14 @@ const TicTacToeComponent = () => {
         name: username || "",
         room: roomName,
       };
+
+      if (
+        activeBlock.findIndex(
+          (block) =>
+            JSON.stringify(block.step) === JSON.stringify(blockIndex.step)
+        ) !== -1
+      )
+        return;
 
       const currentPlayerStep = [...activeBlock, blockIndex].filter(
         (item) => item.name === username
@@ -180,19 +188,6 @@ const TicTacToeComponent = () => {
     [activeBlock, currentPlayer, roomName, username]
   );
 
-  const handleMarkDown = useCallback(
-    (firstIndex: number, secIndex: number) => {
-      const blockValid = activeBlock.some((item) => {
-        return (
-          item.room === roomName &&
-          JSON.stringify(item.step) === JSON.stringify([firstIndex, secIndex])
-        );
-      });
-      return blockValid;
-    },
-    [activeBlock, roomName]
-  );
-
   const handleGenerateIcon = useCallback(
     (firstIndex: number, secIndex: number) => {
       const hosted = activeBlock.findIndex((block) => {
@@ -200,6 +195,7 @@ const TicTacToeComponent = () => {
           JSON.stringify(block.step) === JSON.stringify([firstIndex, secIndex])
         );
       });
+      if (hosted === -1) return;
       const isCurrentUser = activeBlock[hosted].name === username;
       if (isCurrentUser) {
         return <GiCrossMark color="#ED213A" size={28} />;
@@ -235,8 +231,7 @@ const TicTacToeComponent = () => {
                 id={`box-${firstIndex}-${secIndex}`}
                 onClick={() => handleClick(firstIndex, secIndex)}
               >
-                {handleMarkDown(firstIndex, secIndex) &&
-                  handleGenerateIcon(firstIndex, secIndex)}
+                {handleGenerateIcon(firstIndex, secIndex)}
               </RowWrapper>
             ))}
           </div>
