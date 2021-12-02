@@ -37,11 +37,12 @@ const HeaderWrapper = styled.div`
   margin-bottom: 100px;
 `;
 
-const TextWrapper = styled.p`
+const TextWrapper = styled.p<{ isCurrentStep?: boolean }>`
   font-size: 60px;
   -webkit-text-fill-color: #11998e;
   -webkit-text-stroke-width: 2px;
   -webkit-text-stroke-color: #c31432;
+  text-decoration: ${(props) => (props.isCurrentStep ? "underline" : "none")};
 `;
 
 const Container = styled.div`
@@ -98,6 +99,7 @@ const TicTacToeComponent = () => {
   const [activeBlock, setActiveBlock] = useState<BlockIndex[]>([]);
   const [victoryMsg, setVictoryMsg] = useState("");
   const [roomInfo, setRoomInfo] = useState<Room | null>(null);
+  const [currentStep, setCurrentStep] = useState("");
 
   const location: any = useLocation();
   const history = useHistory();
@@ -121,6 +123,7 @@ const TicTacToeComponent = () => {
 
     return () => {
       socket.emit("leave-room", username, roomName);
+      socket.emit("reset-step", roomName);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ENDPOINT]);
@@ -129,6 +132,22 @@ const TicTacToeComponent = () => {
   useEffect(() => {
     socket.emit("get-room-info", roomName, setRoomInfo);
   });
+
+  useEffect(() => {
+    if (!currentStep) {
+      setCurrentStep(roomInfo ? roomInfo.personJoined[0] : "");
+    } else if (activeBlock.length) {
+      if (currentStep === activeBlock[activeBlock.length - 1].name) {
+        const currentPlayerTurn = roomInfo
+          ? roomInfo.personJoined.find((name) => name !== currentStep)
+          : "";
+        if (currentPlayerTurn) {
+          setCurrentStep(currentPlayerTurn);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomInfo, activeBlock, currentStep]);
 
   useEffect(() => {
     socket.on("user-won", (msg: string) => {
@@ -217,9 +236,13 @@ const TicTacToeComponent = () => {
   return (
     <Wrapper>
       <HeaderWrapper>
-        <TextWrapper>{roomInfo?.personJoined[0]}</TextWrapper>
+        <TextWrapper isCurrentStep={currentStep === roomInfo?.personJoined[0]}>
+          {roomInfo?.personJoined[0]}
+        </TextWrapper>
         <TextWrapper>VS</TextWrapper>
-        <TextWrapper>{roomInfo?.personJoined[1]}</TextWrapper>
+        <TextWrapper isCurrentStep={currentStep === roomInfo?.personJoined[1]}>
+          {roomInfo?.personJoined[1]}
+        </TextWrapper>
       </HeaderWrapper>
       <Container>
         {new Array(3).fill(0).map((_, firstIndex) => (
